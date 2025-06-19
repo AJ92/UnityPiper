@@ -1,21 +1,24 @@
 using System;
 using System.IO;
 using System.Threading.Tasks;
+using UnityEngine;
 
 namespace Abuksigun.Piper
 {
     public sealed unsafe class PiperVoice : IDisposable
     {
         Piper piper;
-        PiperLib.Voice* voice;
+        //PiperLib.Voice* voice;
+        IntPtr voicePtr;
+
+        public IntPtr VoicePtr => voicePtr;
 
         public Piper Piper => piper;
-        internal PiperLib.Voice* Voice => voice;
 
-        PiperVoice(Piper piper, PiperLib.Voice* voice)
+        PiperVoice(Piper piper, IntPtr voice)
         {
             this.piper = piper;
-            this.voice = voice;
+            this.voicePtr = voice;
         }
 
         ~PiperVoice()
@@ -25,40 +28,39 @@ namespace Abuksigun.Piper
 
         public void Dispose()
         {
-            if (voice != null)
+            if (voicePtr != IntPtr.Zero)
             {
-                PiperLib.destroy_Voice(voice);
-                voice = null;
+                PiperLib.destroy_Voice(voicePtr);
+                voicePtr = IntPtr.Zero;
             }
         }
 
-        public static Task<PiperVoice> LoadPiperVoice(Piper piper, string fullModelPath)
+        public static PiperVoice LoadPiperVoice(Piper piper, string fullModelPath)
         {
+            Debug.Log("LoadPiperVoice...");
+
             if (!File.Exists(fullModelPath))
                 throw new FileNotFoundException("Model file not found", fullModelPath);
             if (!File.Exists(fullModelPath + ".json"))
                 throw new FileNotFoundException("Model descriptor not found (Make sure it has the same name as model + .json)", fullModelPath);
 
-            return Task.Run(() =>
+            var newVoice = PiperLib.create_Voice();
+            try
             {
-                var newVoice = PiperLib.create_Voice();
-                try
-                {
-                    PiperLib.loadVoice(piper.Config, fullModelPath, fullModelPath + ".json", newVoice, null);
-                    return Task.FromResult(new PiperVoice(piper, newVoice));
-                }
-                catch
-                {
-                    PiperLib.destroy_Voice(newVoice);
-                    throw;
-                }
-            });
+                PiperLib.loadVoice(piper.ConfigPtr, fullModelPath, fullModelPath + ".json", newVoice, null);
+                return new PiperVoice(piper, newVoice);
+            }
+            catch
+            {
+                PiperLib.destroy_Voice(newVoice);
+                throw;
+            }
         }
 
         public float[] TextToPCMAudio(string text)
         {
             float[] audioData = new float[0];
-            TextToAudioStream(text, (short* data, int length) =>
+            TextToAudioStream(text, piper.ConfigPtr, voicePtr, (short* data, int length) =>
             {
                 int writeIndex = audioData.Length;
                 Array.Resize(ref audioData, audioData.Length + length);
@@ -69,10 +71,10 @@ namespace Abuksigun.Piper
             return audioData;
         }
 
-        public void TextToAudioStream(string text, PiperLib.AudioCallbackDelegate audioCallback)
+        public static void TextToAudioStream(string text, IntPtr config, IntPtr voice, PiperLib.AudioCallbackDelegate audioCallback)
         {
             PiperLib.SynthesisResult result = new PiperLib.SynthesisResult();
-            PiperLib.textToAudio(piper.Config, voice, text, &result, audioCallback);
+            PiperLib.textToAudio(config, voice, text, &result, audioCallback);
         }
     }
 }

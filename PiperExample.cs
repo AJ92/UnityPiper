@@ -26,8 +26,8 @@ namespace Abuksigun.Piper
             string fullModelPath = Path.Join(Application.streamingAssetsPath, modelPath);
             string fullEspeakDataPath = Path.Join(Application.streamingAssetsPath, espeakDataPath);
 
-            piper ??= await Piper.LoadPiper(fullEspeakDataPath);
-            voice ??= await PiperVoice.LoadPiperVoice(piper, fullModelPath);
+            piper ??= Piper.LoadPiper(fullEspeakDataPath);
+            voice ??= PiperVoice.LoadPiperVoice(piper, fullModelPath);
             piperSpeaker ??= new PiperSpeaker(voice);
             _ = piperSpeaker.ContinueSpeach(text).ContinueWith(x => Debug.Log($"Generation finished with status: {x.Status}"));
             audioSource.clip = piperSpeaker.AudioClip;

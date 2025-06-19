@@ -9,38 +9,25 @@ namespace Abuksigun.Piper
     {
         private const string DllName = "piperlib"; // Replace with the actual name of your DLL
 
-        [StructLayout(LayoutKind.Sequential, CharSet = CharSet.Ansi)]
-        public struct PiperConfig
+        [StructLayout(LayoutKind.Sequential)]
+        public struct OptionalLong
         {
-            //public string eSpeakDataPath;
-            //public bool useESpeak;
-            //public bool useTashkeel;
-            //public OptionalString tashkeelModelPath;
-            //public IntPtr tashkeelState; // Assuming tashkeel::State is represented as a pointer/handle
-        }
-
-        public struct OptionalString
-        {
-            //public bool hasValue;
-            //public string value;
+            [MarshalAs(UnmanagedType.I1)]  // ensures 1-byte boolean
+            public bool hasValue;
+            public long value;
         }
 
         [StructLayout(LayoutKind.Sequential)]
+        public struct OptionalPhonemeSilenceSecondsMap
+        {
+            [MarshalAs(UnmanagedType.I1)]  // ensures 1-byte boolean
+            public bool hasValue;
+            public PhonemeSilenceSecondsMap* value;
+        }
+
+        [StructLayout(LayoutKind.Sequential, Pack = 4)]
         public struct SynthesisConfig
         {
-            public struct OptionalLong
-            {
-                public bool hasValue;
-                public long value;
-            }
-
-            [StructLayout(LayoutKind.Sequential)]
-            public struct OptionalPhonemeSilenceSecondsMap
-            {
-                public bool hasValue;
-                public PhonemeSilenceSecondsMap* value;
-            }
-
             public float noiseScale;
             public float lengthScale;
             public float noiseW;
@@ -49,10 +36,10 @@ namespace Abuksigun.Piper
             public int sampleWidth;
             public int channels;
 
-            public OptionalLong speakerId;
+//            public OptionalLong speakerId;
 
-            public float sentenceSilenceSeconds;
-            public OptionalPhonemeSilenceSecondsMap phonemeSilenceSeconds;
+//            public float sentenceSilenceSeconds;
+//            public OptionalPhonemeSilenceSecondsMap phonemeSilenceSeconds;
         }
 
 
@@ -71,36 +58,25 @@ namespace Abuksigun.Piper
             public double realTimeFactor;
         }
 
-        [StructLayout(LayoutKind.Sequential)]
-        public struct Voice
-        {
-            //public IntPtr configRoot; // Handle for json
-            //public PhonemizeConfig phonemizeConfig;
-            //public SynthesisConfig synthesisConfig;
-            //public ModelConfig modelConfig;
-            //public ModelSession session;
-        }
-
         [UnmanagedFunctionPointer(CallingConvention.Cdecl)]
         public delegate void AudioCallback();
 
 
         [DllImport(DllName, CallingConvention = CallingConvention.Cdecl)]
-        public static extern PiperConfig* create_PiperConfig(string eSpeakDataPath);
+        public static extern IntPtr create_PiperConfig(string eSpeakDataPath);
 
         [DllImport(DllName, CallingConvention = CallingConvention.Cdecl)]
-        public static extern void destroy_PiperConfig(PiperConfig* config);
+        public static extern void destroy_PiperConfig(IntPtr config);
 
         [DllImport(DllName, CallingConvention = CallingConvention.Cdecl)]
-        public static extern Voice* create_Voice();
+        public static extern IntPtr create_Voice();
 
         [DllImport(DllName, CallingConvention = CallingConvention.Cdecl)]
-        public static extern void destroy_Voice(Voice* voice);
-
+        public static extern void destroy_Voice(IntPtr voice);
 
 
         [DllImport(DllName, CallingConvention = CallingConvention.Cdecl)]
-        public static extern SynthesisConfig getSynthesisConfig(Voice* voice);
+        public static extern IntPtr getSynthesisConfig(IntPtr voice);
 
         [DllImport(DllName, CallingConvention = CallingConvention.Cdecl, CharSet = CharSet.Ansi)]
         public static extern bool isSingleCodepoint(string s);
@@ -112,22 +88,22 @@ namespace Abuksigun.Piper
         public static extern IntPtr getVersion();
 
         [DllImport(DllName, CallingConvention = CallingConvention.Cdecl)]
-        public static extern void initializePiper(PiperConfig* config);
+        public static extern void initializePiper(IntPtr config);
 
         [DllImport(DllName, CallingConvention = CallingConvention.Cdecl)]
-        public static extern void terminatePiper(PiperConfig* config);
+        public static extern void terminatePiper(IntPtr config);
 
         [DllImport(DllName, CallingConvention = CallingConvention.Cdecl, CharSet = CharSet.Ansi)]
-        public static extern void loadVoice(PiperConfig* config, string modelPath, string modelConfigPath, Voice* voice, Int64* speakerId);
+        public static extern void loadVoice(IntPtr config, string modelPath, string modelConfigPath, IntPtr voice, Int64* speakerId);
 
         [UnmanagedFunctionPointer(CallingConvention.Cdecl)]
         public delegate void AudioCallbackDelegate(short* audioBuffer, int length);
 
         [DllImport(DllName, CallingConvention = CallingConvention.Cdecl, CharSet = CharSet.Ansi)]
-        public static extern void textToAudio(PiperConfig* config, Voice* voice, string text, SynthesisResult* result, AudioCallbackDelegate audioCallback);
+        public static extern void textToAudio(IntPtr config, IntPtr voice, string text, SynthesisResult* result, AudioCallbackDelegate audioCallback);
 
 
         [DllImport(DllName, CallingConvention = CallingConvention.Cdecl, CharSet = CharSet.Ansi)]
-        public static extern void textToWavFile(PiperConfig* config, Voice* voice, string text, string audioFile, SynthesisResult* result);
+        public static extern void textToWavFile(IntPtr config, IntPtr voice, string text, string audioFile, SynthesisResult* result);
     }
 }

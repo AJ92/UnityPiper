@@ -1,17 +1,19 @@
 using System;
 using System.IO;
 using System.Threading.Tasks;
+using UnityEngine;
 
 namespace Abuksigun.Piper
 {
     public sealed unsafe class Piper : IDisposable
     {
-        PiperLib.PiperConfig* config;
-        public PiperLib.PiperConfig* Config => config;
+        IntPtr configPtr;
 
-        Piper(PiperLib.PiperConfig* config)
+        public IntPtr ConfigPtr => configPtr;
+
+        Piper(IntPtr configPtr)
         {
-            this.config = config;
+            this.configPtr = configPtr;
         }
 
         ~Piper()
@@ -21,33 +23,33 @@ namespace Abuksigun.Piper
 
         public void Dispose()
         {
-            if (config != null)
+            if (configPtr != IntPtr.Zero)
             {
-                PiperLib.terminatePiper(config);
-                PiperLib.destroy_PiperConfig(config);
-                config = null;
+                PiperLib.terminatePiper(configPtr);
+                PiperLib.destroy_PiperConfig(configPtr);
+                configPtr = IntPtr.Zero;
             }
         }
 
-        public static Task<Piper> LoadPiper(string fullEspeakDataPath)
+        public static Piper LoadPiper(string fullEspeakDataPath)
         {
+            Debug.Log("LoadPiper...");
+
             if (!Directory.Exists(fullEspeakDataPath))
                 throw new DirectoryNotFoundException("Espeak data directory not found");
 
-            return Task.Run(() =>
+
+            var piperConfig = PiperLib.create_PiperConfig(fullEspeakDataPath);
+            try
             {
-                var piperConfig = PiperLib.create_PiperConfig(fullEspeakDataPath);
-                try
-                {
-                    PiperLib.initializePiper(piperConfig);
-                    return Task.FromResult(new Piper(piperConfig));
-                }
-                catch
-                {
-                    PiperLib.destroy_PiperConfig(piperConfig);
-                    throw;
-                }
-            });
+                PiperLib.initializePiper(piperConfig);
+                return new Piper(piperConfig);
+            }
+            catch
+            {
+                PiperLib.destroy_PiperConfig(piperConfig);
+                throw;
+            }
         }
     }
 }

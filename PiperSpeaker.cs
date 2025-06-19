@@ -2,6 +2,8 @@ using System;
 using System.Collections.Generic;
 using System.Threading.Tasks;
 using UnityEngine;
+using System.Runtime.InteropServices;
+using AOT;
 
 namespace Abuksigun.Piper
 {
@@ -17,11 +19,29 @@ namespace Abuksigun.Piper
 
         public AudioClip AudioClip => audioClip;
 
+        // only one instance currently...
+        private static PiperSpeaker _instance = null;
+
+
         public unsafe PiperSpeaker(PiperVoice voice)
         {
+            Debug.Log("PiperSpeaker ctor");
             this.voice = voice;
-            PiperLib.SynthesisConfig synthesisConfig = PiperLib.getSynthesisConfig(voice.Voice);
+            Debug.Log($"Voice pointer address: 0x{this.voice.VoicePtr.ToString("X")}");
+            IntPtr synthesisConfigPtr = PiperLib.getSynthesisConfig(this.voice.VoicePtr);
+
+            PiperLib.SynthesisConfig synthesisConfig = new PiperLib.SynthesisConfig();
+            if (synthesisConfigPtr != IntPtr.Zero)
+            {
+                synthesisConfig = Marshal.PtrToStructure<PiperLib.SynthesisConfig>(synthesisConfigPtr);
+            }
+            else
+            {
+                Debug.LogWarning("SynthesisConfig ptr is zero...");
+            }
             audioClip = AudioClip.Create("MyPCMClip", 1024 * 24, synthesisConfig.channels, synthesisConfig.sampleRate, true, PCMRead);
+
+            _instance = this;
         }
 
         ~PiperSpeaker()
@@ -51,24 +71,39 @@ namespace Abuksigun.Piper
         // Use when you want to add more text to the current speech
         public unsafe Task ContinueSpeach(string text)
         {
-            if (speachTask == null || speachTask.IsCompleted)
+            IntPtr configPtr = voice.Piper.ConfigPtr;
+            IntPtr voicePtr = voice.VoicePtr;
+            if ((speachTask == null || speachTask.IsCompleted) && (_instance != null))
             {
                 speachTask = Task.Run(() =>
                 {
                     do
                     {
-                        voice.TextToAudioStream(text, (short* data, int length) => AddPCMData(data, length));
+                        PiperVoice.TextToAudioStream(text, configPtr, voicePtr, AddPCMDataStatic);
                         text = queuedText;
                         queuedText = null;
                     }
                     while (text != null);
-                });
+                })
+                .ContinueWith(t =>
+                {
+                    if (t.Exception != null)
+                    {
+                        Debug.LogError($"ContinueSpeach Task Exception: {t.Exception.Flatten()}");
+                    }
+                }, TaskContinuationOptions.OnlyOnFaulted);
             }
             else
             {
                 queuedText = text;
             }
             return speachTask;
+        }
+
+        [AOT.MonoPInvokeCallback(typeof(PiperLib.AudioCallbackDelegate))]
+        private static unsafe void AddPCMDataStatic(short* data, int length)
+        {
+            _instance.AddPCMData(data, length);
         }
 
         void PCMRead(float[] data)
